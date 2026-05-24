@@ -1,0 +1,53 @@
+name: Deploy
+
+on: push
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to W7S
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Deploy
+        uses: w7s-io/w7s-cloud@v1
+        with:
+          token: ${{ github.token }}
+
+      - name: Smoke test RPC
+        run: |
+          set -euo pipefail
+          url="https://w7s-io.w7s.cloud/example-rpc-client/datetime"
+
+          for attempt in {1..12}; do
+            if body="$(curl -fsS "$url")"; then
+              echo "$body"
+              BODY="$body" node - <<'NODE'
+          const body = JSON.parse(process.env.BODY);
+          if (body.service !== "example-rpc-client") {
+            throw new Error(`Unexpected service: ${body.service}`);
+          }
+          if (body.datetime?.service !== "example-rpc-datetime") {
+            throw new Error("RPC response did not come from example-rpc-datetime.");
+          }
+          if (body.datetime?.viaRpc !== true) {
+            throw new Error("Datetime service was not reached through W7S RPC.");
+          }
+          if (body.datetime?.caller !== "w7s-io/example-rpc-client") {
+            throw new Error(`Unexpected RPC caller: ${body.datetime?.caller}`);
+          }
+          NODE
+              exit 0
+            fi
+            sleep 5
+          done
+
+          curl -fsS "$url"
