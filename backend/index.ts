@@ -23,8 +23,6 @@ const callDatetime = (env: Env) =>
     {
       headers: {
         authorization: `Bearer ${env.W7S_RPC_TOKEN}`,
-        "x-w7s-rpc-caller": env.W7S_REPOSITORY,
-        "x-w7s-rpc-environment": env.W7S_ENVIRONMENT,
         accept: "application/json"
       }
     }
